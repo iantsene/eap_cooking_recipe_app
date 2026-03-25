@@ -1,82 +1,117 @@
 import sqlite3
-# Η python εχει ενσωμματωμένη την sqlite3 οποτε μπορούμε να την κάνουμε import κατευθείαν
 
-conn = sqlite3.connect('recipe_database.db')
-# Το πρώτο βήμα για να στήσουμε μια βάση δεδομένων είναι να φτιαξουμε μια μεταβλητη και να την εξισώσουμε με το ονομα της βάσης δεδομένων μας. Αν υπάρχει η βάση ήδη η python θα συνδεθεί σε αυτήν. Αν δεν υπάρχει θα την δημιουγήσει
+class DatabaseConn:
+    def __init__(self, db_str):
+        self.db_str = db_str
+        self.connection = None
+        self.cursor = None
 
-cursor = conn.cursor()
-# Το δευτερο βήμα είναι να δημιουργήσουμε εναν κέρσορα. Αυτός χρειάζεται για να αλληλεπιδράσουμε με τη βάση μας μέσω εντολών SQL. Αυτό θα μας επιτρέψει να δημιουργήσουμε και να τροποποιήσουμε πίνακες μέσα στη βάση μας.
+    def __enter__(self):
+        print("Initializing database connection...")
+        self.connection = sqlite3.connect(self.db_str)
+        self.cursor = self.connection.cursor()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        print("Cleaning up...")
+        if exc_type is not None:
+            print(f"Exception type: {exc_type}")
+            print(f"Exception value: {exc_value}")
+            print(f"Traceback: {traceback}")
+            self.connection.rollback()
+        else:
+            self.connection.commit()
+        if self.connection:
+            self.connection.close()
+        return False
 
-create_recipe_table = """CREATE TABLE IF NOT EXISTS
-recipes(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, category TEXT, difficulty INTEGER, total_time_minutes INTEGER)"""
-# Δημιουργούμε μια εντολή SQL που θα δημιουργήσει εναν πίνακα ονόματι "recipes" αν αυτός δεν υπάρχει. Ορίζουμε ενα id οπου θα μετράει τις εισαγωγές δεδομένων σε κάθε σειρά/γραμμή του πίνακα και του δίνουμε τύπο δεδομένων INTEGER και του δίνουμε την ιδιότητα PRIMARY KEY για να ορίσουμε οτι θα είναι το κύριο στοιχείο του πίνακα οπου θα χρησιμοποιούμε για να αναφερθούμε στην συγκεκριμένη καταχώρηση που θέλουμε να τροποποιήσουμε στο μέλλον. Βάζουμε AUTOINCREMENT για να δίνεται αυτόματα αυξοντας σειράς ID κάθε φορά που κάνουμε καταχώρηση μέσα στον πίνακα χωρίς να το κάνουμε εμείς χειροκίνητα. Τα υπόλοιπα στοιχεία του πίνακα πρέπει να αντικατοπτρίζουν τα δεδομένα που θα εισάγουμε σε κάθε καταχώρηση απο το πρόγραμμα μας ώστε να έχουμε όλη την πληροφορία εκεί για επεξεργασία απο το πρόγραμμα μας.
+    def execute(self, sql, params=None):
+        if params:
+            return self.cursor.execute(sql, params)
+        return self.cursor.execute(sql)
+    
+    def commit(self):
+        if self.connection:
+            self.connection.commit()
 
-cursor.execute(create_recipe_table)
-# Τρέχει τον κώδικα της SQL στη μνήμη του υπολογιστή
-conn.commit()
-# Ενσωμματώνει τις άλλαγές που έχουν γίνει στη μνήμη με το execute επίσημα πια στη βάση.
-conn.close()
-# Κλείνει τη σύνδεση με τη βάση ωστε να μην γίνονται πιά αλλαγές
 
-def add_recipe():
-    print("Enter the recipe name:")
-    name = input()
-    print("Enter the recipe category:")
-    category = input()
-    print("Enter the recipe difficulty level (1-10):")
-    difficulty = int(input())
-    print("Enter the recipe total time of execution in minutes:")
-    total_time_minutes = int(input())
-    with sqlite3.connect('recipe_database.db') as conn:
-        cursor = conn.cursor()
-        insert_data_in_recipes = """INSERT INTO recipes(name, category, difficulty, total_time_minutes) VALUES(?, ?, ?, ?)"""
-        cursor.execute(insert_data_in_recipes, (name, category, difficulty, total_time_minutes))
-        conn.commit()
-    print("Recipe added successfully!")
+with DatabaseConn("recipe_database.db") as rcp_db:
+    create_recipe_table = """CREATE TABLE IF NOT EXISTS recipes(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, category TEXT, difficulty INTEGER, total_time_minutes INTEGER)"""
+    create_ingredients_table = """CREATE TABLE IF NOT EXISTS ingredients(id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER, name TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes(id))"""
+    create_recipeSteps_table = """CREATE TABLE IF NOT EXISTS steps(id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER, name TEXT, sequence_order INTEGER, description TEXT, duration_in_minutes INTEGER, FOREIGN KEY (recipe_id) REFERENCES recipes(id))"""
+    rcp_db.execute(create_recipe_table)
+    rcp_db.execute(create_ingredients_table)
+    rcp_db.execute(create_recipeSteps_table)
 
-def recipe_search(id):
-    with sqlite3.connect('recipe_database.db') as conn:
-        cursor = conn.cursor()
-        sql_str = """SELECT * FROM recipes WHERE id = ?"""
-        cursor.execute(sql_str, (id,))
-        results = cursor.fetchone()
-    return results
+# Under construction
+class Steps:
+    def __init__(self, name, sequence_order, description, duration_in_minutes):
+        self.name = name
+        self.sequence_order = sequence_order
+        self.description = description
+        self.duration_in_minutes = duration_in_minutes
 
-def update_recipe(id): # Needs work to get the fields towards updating from the user/frontend
-    with sqlite3.connect('recipe_database.db') as conn:
-        cursor = conn.cursor()
-        sql_str = """UPDATE recipes SET FIELD1 = ?, FIELD2 = ?, FIELD3 = ? WHERE id = ?"""
-        cursor.execute(sql_str, (id,))
-        conn.commit()
-    pass
+# Under construction
+class Ingredients:
+    def __init__(self, name, quantity, unit=None, recipe_id=None):
+        self.name = name
+        self.quantity = quantity
+        self.unit = unit
+        self.recipe_id = recipe_id
+        self.id = None
 
-def delete_recipe(id):
-    with sqlite3.connect('recipe_database.db') as conn:
-        cursor = conn.cursor()
-        sql_str = """DELETE FROM recipes WHERE id = ?"""
-        cursor.execute(sql_str, (id,))
-        conn.commit()
-    if cursor.rowcount > 0:
-        print(f"{cursor.rowcount} recipe deleted.")
-    else:
-        print("No such recipe found to be deleted.")
+# Needs adjustments
+class Recipe:
+    def __init__(self, name, category, difficulty, total_time_minutes):
+        self.name = name
+        self.category = category
+        self.difficulty = difficulty
+        self.total_time_minutes = total_time_minutes
 
-def launch_recipe(id):
-    pass
+    def add_recipe(self):
+        print("Enter the recipe name:")
+        self.name = input()
+        print("Enter the recipe category:")
+        self.category = input()
+        print("Enter the recipe difficulty level (1-10):")
+        self.difficulty = int(input())
+        print("Enter the recipe total time of execution in minutes:")
+        self.total_time_minutes = int(input())
+        with DatabaseConn("recipe_database.db") as conn:
+            insert_data_in_recipes = """INSERT INTO recipes(name, category, difficulty, total_time_minutes) VALUES(?, ?, ?, ?)"""
+            conn.cursor.execute(insert_data_in_recipes, (self.name, self.category, self.difficulty, self.total_time_minutes))
+            conn.commit()
+        print("Recipe added successfully!")
 
-def get_all_recipes():
-    with sqlite3.connect('recipe_database.db') as conn:
-        cursor = conn.cursor()
-        fetch_recipes = """SELECT * FROM recipes"""
-        cursor.execute(fetch_recipes)
-        results = cursor.fetchall()
-        for row in results:
-            print(row)
-    return
+    def recipe_search(self):
+        with DatabaseConn("recipe_database.db") as conn:
+            cursor = conn.cursor()
+            sql_str = """SELECT * FROM recipes WHERE name = ?"""
+            cursor.execute(sql_str, (self.name,))
+            results = cursor.fetchone()
+        return results
 
-# add_recipe()
-# recipe_to_search = recipe_search(1)
-# print(recipe_to_search)
-recipe_to_delete = delete_recipe(1)
-recipes = get_all_recipes()
-print(recipes)
+    def delete_recipe(self):
+        with DatabaseConn("recipe_database.db") as conn:
+            cursor = conn.cursor()
+            sql_str = """DELETE FROM recipes WHERE name = ?"""
+            cursor.execute(sql_str, (self.name,))
+            conn.commit()
+        if cursor.rowcount > 0:
+            print(f"{cursor.rowcount} recipe deleted.")
+        else:
+            print("No such recipe found to be deleted.")
+
+    def launch_recipe(id):
+        pass
+
+    def get_all_recipes(self):
+        with DatabaseConn("recipe_database.db") as conn:
+            cursor = conn.cursor()
+            fetch_recipes = """SELECT * FROM recipes"""
+            cursor.execute(fetch_recipes)
+            results = cursor.fetchall()
+            for row in results:
+                print(row)
+        return
+
