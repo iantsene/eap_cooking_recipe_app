@@ -294,9 +294,28 @@ class RecipeFormPage:
             row=4, column=1, sticky=tk.E, padx=5
         )
         
-        # Listbox για εμφάνιση των συστατικών
-        self.ingredients_listbox = tk.Listbox(self.window, width=50, height=5)
-        self.ingredients_listbox.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
+        # Treeview για εμφάνιση των συστατικών (αντί για Listbox)
+        columns = ('Όνομα', 'Ποσότητα', 'Μονάδα', 'Σημειώσεις')
+        self.ingredients_tree = ttk.Treeview(self.window, columns=columns, show='headings', height=5)
+        
+        # Ορισμός επικεφαλίδων
+        self.ingredients_tree.heading('Όνομα', text='Όνομα')
+        self.ingredients_tree.heading('Ποσότητα', text='Ποσότητα')
+        self.ingredients_tree.heading('Μονάδα', text='Μονάδα')
+        self.ingredients_tree.heading('Σημειώσεις', text='Σημειώσεις')
+        
+        # Ορισμός πλάτους στηλών
+        self.ingredients_tree.column('Όνομα', width=150)
+        self.ingredients_tree.column('Ποσότητα', width=80)
+        self.ingredients_tree.column('Μονάδα', width=80)
+        self.ingredients_tree.column('Σημειώσεις', width=150)
+        
+        self.ingredients_tree.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='nsew')
+
+        # Scrollbar για τα συστατικά
+        ing_scrollbar = ttk.Scrollbar(self.window, orient=tk.VERTICAL, command=self.ingredients_tree.yview)
+        ing_scrollbar.grid(row=5, column=2, sticky='ns', padx=(0, 5))
+        self.ingredients_tree.configure(yscrollcommand=ing_scrollbar.set)
 
         # Κουμπιά επεξεργασίας/διαγραφής για συστατικά
         ing_btn_frame = ttk.Frame(self.window)
@@ -314,9 +333,28 @@ class RecipeFormPage:
             row=8, column=1, sticky=tk.E, padx=5
         )
         
-        # Listbox για εμφάνιση των βημάτων
-        self.steps_listbox = tk.Listbox(self.window, width=50, height=5)
-        self.steps_listbox.grid(row=9, column=0, columnspan=2, padx=5, pady=5)
+        # Treeview για εμφάνιση των βημάτων (αντί για Listbox)
+        step_columns = ('Αρ.', 'Τίτλος', 'Περιγραφή', 'Διάρκεια (λεπτά)')
+        self.steps_tree = ttk.Treeview(self.window, columns=step_columns, show='headings', height=5)
+        
+        # Ορισμός επικεφαλίδων
+        self.steps_tree.heading('Αρ.', text='Αρ.')
+        self.steps_tree.heading('Τίτλος', text='Τίτλος')
+        self.steps_tree.heading('Περιγραφή', text='Περιγραφή')
+        self.steps_tree.heading('Διάρκεια (λεπτά)', text='Διάρκεια (λεπτά)')
+        
+        # Ορισμός πλάτους στηλών
+        self.steps_tree.column('Αρ.', width=50)
+        self.steps_tree.column('Τίτλος', width=150)
+        self.steps_tree.column('Περιγραφή', width=200)
+        self.steps_tree.column('Διάρκεια (λεπτά)', width=100)
+        
+        self.steps_tree.grid(row=9, column=0, columnspan=2, padx=5, pady=5, sticky='nsew')
+
+        # Scrollbar για τα βήματα
+        step_scrollbar = ttk.Scrollbar(self.window, orient=tk.VERTICAL, command=self.steps_tree.yview)
+        step_scrollbar.grid(row=9, column=2, sticky='ns', padx=(0, 5))
+        self.steps_tree.configure(yscrollcommand=step_scrollbar.set)
 
         # Κουμπιά επεξεργασίας/διαγραφής για βήματα
         step_btn_frame = ttk.Frame(self.window)
@@ -344,15 +382,33 @@ class RecipeFormPage:
 
     def refresh_ingredients_list(self):
         """Ανανέωση της λίστας εμφάνισης των συστατικών"""
-        self.ingredients_listbox.delete(0, tk.END)  # Καθαρισμός υπάρχουσας λίστας
+        # Καθαρισμός υπάρχουσας λίστας
+        for item in self.ingredients_tree.get_children():
+            self.ingredients_tree.delete(item)
+        
+        # Εισαγωγή νέων δεδομένων
         for ing in self.ingredients:
-            self.ingredients_listbox.insert(tk.END, str(ing))  # Χρήση της μεθόδου __str__ του Ingredient
+            self.ingredients_tree.insert('', 'end', values=(
+                ing.name or "",
+                ing.quantity or "",
+                ing.unit or "",
+                ing.notes or ""
+            ))
 
     def refresh_steps_list(self):
         """Ανανέωση της λίστας εμφάνισης των βημάτων"""
-        self.steps_listbox.delete(0, tk.END)
-        for step in self.steps:
-            self.steps_listbox.insert(tk.END, str(step))  # Χρήση της μεθόδου __str__ του Step
+        # Καθαρισμός υπάρχουσας λίστας
+        for item in self.steps_tree.get_children():
+            self.steps_tree.delete(item)
+        
+        # Εισαγωγή νέων δεδομένων
+        for i, step in enumerate(self.steps, 1):
+            self.steps_tree.insert('', 'end', values=(
+                i,
+                step.step_name or "",
+                step.step_text or "",
+                step.duration_in_minutes or ""
+            ))
 
     def _prefill(self, recipe_id):
         """Φόρτωση δεδομένων υπάρχουσας συνταγής για επεξεργασία"""
@@ -374,9 +430,11 @@ class RecipeFormPage:
         
         # Επιλογή της τιμής στο combobox
         if difficulty_value in ["Easy", "Medium", "Hard"]:
-            self.difficulty_combo.set(difficulty_value)
+            # Μετατροπή στα ελληνικά
+            gr_map = {"Easy": "Εύκολη", "Medium": "Μέτρια", "Hard": "Δύσκολη"}
+            self.difficulty_combo.set(gr_map.get(difficulty_value, "Μέτρια"))
         else:
-            self.difficulty_combo.set("Medium")  # Προεπιλεγμένη τιμή
+            self.difficulty_combo.set("Μέτρια")  # Προεπιλεγμένη τιμή
         
         # Συμπλήρωση χρόνου και λιστών
         self.total_time_entry.insert(0, recipe.total_time_minutes)
@@ -395,7 +453,7 @@ class RecipeFormPage:
 
         # Έλεγχος εγκυρότητας: επιλογή δυσκολίας
         difficulty = self.difficulty_var.get()
-        if difficulty not in ["Ευκολη", "Μέτρια", "Δύσκολη"]:
+        if difficulty not in ["Εύκολη", "Μέτρια", "Δύσκολη"]:
             messagebox.showerror("Σφάλμα", "Παρακαλώ επιλέξτε έγκυρο βαθμό δυσκολίας.")
             return
 
@@ -455,38 +513,52 @@ class RecipeFormPage:
 
     def open_edit_ingredient_form(self):
         """Άνοιγμα φόρμας για επεξεργασία επιλεγμένου συστατικού"""
-        selected = self.ingredients_listbox.curselection()
+        selected = self.ingredients_tree.selection()  # Αλλαγή από curselection σε selection
         if not selected:
             messagebox.showwarning("Προειδοποίηση", "Επιλέξτε ένα συστατικό για επεξεργασία.")
             return
-        index = selected[0]
+        
+        # Παίρνουμε το index από τη σειρά του επιλεγμένου item στο tree
+        all_items = self.ingredients_tree.get_children()
+        index = all_items.index(selected[0])
         IngredientFormPage(parent_form=self, index=index, ingredient=self.ingredients[index])
 
     def delete_ingredient(self):
         """Διαγραφή επιλεγμένου συστατικού"""
-        selected = self.ingredients_listbox.curselection()
+        selected = self.ingredients_tree.selection()  # Αλλαγή από curselection σε selection
         if not selected:
             messagebox.showwarning("Προειδοποίηση", "Επιλέξτε ένα συστατικό για διαγραφή.")
             return
-        self.ingredients.pop(selected[0])  # Αφαίρεση από τη λίστα
+        
+        # Παίρνουμε το index από τη σειρά του επιλεγμένου item στο tree
+        all_items = self.ingredients_tree.get_children()
+        index = all_items.index(selected[0])
+        self.ingredients.pop(index)  # Αφαίρεση από τη λίστα
         self.refresh_ingredients_list()    # Ανανέωση εμφάνισης
 
     def open_edit_step_form(self):
         """Άνοιγμα φόρμας για επεξεργασία επιλεγμένου βήματος"""
-        selected = self.steps_listbox.curselection()
+        selected = self.steps_tree.selection()  # Αλλαγή από curselection σε selection
         if not selected:
             messagebox.showwarning("Προειδοποίηση", "Επιλέξτε ένα βήμα για επεξεργασία.")
             return
-        index = selected[0]
+        
+        # Παίρνουμε το index από τη σειρά του επιλεγμένου item στο tree
+        all_items = self.steps_tree.get_children()
+        index = all_items.index(selected[0])
         StepFormPage(parent_form=self, index=index, step=self.steps[index])
 
     def delete_step(self):
         """Διαγραφή επιλεγμένου βήματος και αναριθμοδότηση των υπόλοιπων"""
-        selected = self.steps_listbox.curselection()
+        selected = self.steps_tree.selection()  # Αλλαγή από curselection σε selection
         if not selected:
             messagebox.showwarning("Προειδοποίηση", "Επιλέξτε ένα βήμα για διαγραφή.")
             return
-        self.steps.pop(selected[0])  # Αφαίρεση από τη λίστα
+        
+        # Παίρνουμε το index από τη σειρά του επιλεγμένου item στο tree
+        all_items = self.steps_tree.get_children()
+        index = all_items.index(selected[0])
+        self.steps.pop(index)  # Αφαίρεση από τη λίστα
         
         # Αναριθμοδότηση των sequence_order για τα υπόλοιπα βήματα
         for i, step in enumerate(self.steps):
@@ -505,8 +577,8 @@ class RecipeApp:
         self.root = root
 
         # Ρύθμιση μεγέθους και κεντραρίσματος του παραθύρου
-        width = 600
-        height = 300
+        width = 700
+        height = 500
 
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
@@ -523,10 +595,25 @@ class RecipeApp:
         ttk.Button(root, text="Ενημέρωση Συνταγής", command=self.open_update_page).grid(row=0, column=1, pady=10, padx=10)
         ttk.Button(root, text="Διαγραφή Συνταγής", command=self.delete_recipe).grid(row=0, column=2, pady=10, padx=10)
         ttk.Button(root, text="Εμφάνιση Συνταγών",  command=self.view_recipes).grid(row=0, column=3, pady=10, padx=10)
+        ttk.Button(root, text="Εμφάνιση Συνταγης",  command=self.view_recipe).grid(row=1, column=1, pady=10, padx=10)
+        ttk.Button(root, text="Αναζήτηση Συνταγής",  command=self.recipe_lookup).grid(row=1, column=2, pady=10, padx=10)
 
         # Listbox για εμφάνιση όλων των συνταγών
-        self.recipes_listbox = tk.Listbox(root, width=70, height=10)
-        self.recipes_listbox.grid(row=1, column=0, columnspan=4, padx=5, pady=5)
+        self.recipes_table = ttk.Treeview(root, columns=('Αριθμός', 'Όνομα', 'Κατηγορία', 'Δυσκολία', 'Χρόνος Εκτέλεσης'), show='headings')
+        self.recipes_table.heading('Αριθμός', text='Αριθμός')
+        self.recipes_table.heading('Όνομα', text='Όνομα Συνταγής')
+        self.recipes_table.heading('Κατηγορία', text='Κατηγορία')
+        self.recipes_table.heading('Δυσκολία', text='Δυσκολία')
+        self.recipes_table.heading('Χρόνος Εκτέλεσης', text='Χρόνος Εκτέλεσης')
+
+        # Ρύθμιση πλάτους στηλών (προαιρετικά)
+        self.recipes_table.column('Αριθμός', width=55)
+        self.recipes_table.column('Όνομα', width=200)
+        self.recipes_table.column('Κατηγορία', width=100)
+        self.recipes_table.column('Δυσκολία', width=100)
+        self.recipes_table.column('Χρόνος Εκτέλεσης', width=150)
+
+        self.recipes_table.grid(row=2, column=0, columnspan=4, padx=5, pady=15)
 
         # Αρχική φόρτωση των συνταγών
         self.view_recipes()
@@ -537,43 +624,47 @@ class RecipeApp:
 
     def open_update_page(self):
         """Άνοιγμα φόρμας για ενημέρωση επιλεγμένης συνταγής"""
-        selected = self.recipes_listbox.curselection()
+        selected = self.recipes_table.selection()  # Αντί για curselection()
         if not selected:
             print("Επιλέξτε μια συνταγή για ενημέρωση.")
             return
-        # Εξαγωγή του ID από το επιλεγμένο στοιχείο (το ID είναι στην αρχή πριν από ":")
-        recipe_id = int(self.recipes_listbox.get(selected[0]).split(":")[0].strip())
-        RecipeFormPage(parent_app=self, recipe_id=recipe_id)  # Δίνουμε recipe_id = λειτουργία επεξεργασίας
+        # Λήψη των τιμών της επιλεγμένης γραμμής
+        values = self.recipes_table.item(selected[0])['values']
+        recipe_id = values[0]  # Το ID είναι στην πρώτη στήλη
+        RecipeFormPage(parent_app=self, recipe_id=recipe_id)
 
     def delete_recipe(self):
         """Διαγραφή επιλεγμένης συνταγής από τη βάση"""
-        selected = self.recipes_listbox.curselection()
+        selected = self.recipes_table.selection()  # Αντί για curselection()
         if selected:
-            recipe_id = int(self.recipes_listbox.get(selected[0]).split(":")[0].strip())
+            values = self.recipes_table.item(selected[0])['values']
+            recipe_id = values[0]
             with DatabaseConn("recipe_database.db") as db:
                 db.execute("DELETE FROM recipes WHERE id=?", (recipe_id,))
             self.view_recipes()  # Ανανέωση της λίστας μετά τη διαγραφή
         else:
             print("Επιλέξτε μια συνταγή για διαγραφή.")
-
     def view_recipes(self):
         """Φόρτωση και εμφάνιση όλων των συνταγών στη λίστα"""
-        self.recipes_listbox.delete(0, tk.END)  # Καθαρισμός υπάρχουσας λίστας
+        # Καθαρισμός υπάρχουσας λίστας - για Treeview χρησιμοποιούμε delete με all items
+        for item in self.recipes_table.get_children():
+            self.recipes_table.delete(item)
+        
         with DatabaseConn("recipe_database.db") as db:
             # Επιλογή όλων των συνταγών από τη βάση
             db.execute("SELECT id, name, category, difficulty, total_time_minutes FROM recipes")
             rows = db.fetchall()
         
-        # Εισαγωγή κάθε συνταγής στη λίστα
+        # Εισαγωγή κάθε συνταγής στο Treeview
         for row in rows:
-            self.recipes_listbox.insert(tk.END, f"{row[0]}: {row[1]} - {row[2]} - Δυσκολία {row[3]}")
+            self.recipes_table.insert('', 'end', values=(row[0], row[1], row[2], row[3], f"{row[4]} λεπτά"))
 
-    def clear_entries(self):
-        """Καθαρισμός πεδίων εισαγωγής (δεν χρησιμοποιείται πλέον, αλλά αφήνεται για συμβατότητα)"""
-        self.name_entry.delete(0, tk.END)
-        self.category_entry.delete(0, tk.END)
-        self.difficulty_entry.delete(0, tk.END)
-        self.total_time_entry.delete(0, tk.END)
+    def view_recipe(self):
+        pass
+
+    def recipe_lookup(self):
+        pass
+
 
 
 # Σημείο εισόδου της εφαρμογής
