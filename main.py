@@ -395,7 +395,7 @@ class RecipeFormPage:
 
         # Έλεγχος εγκυρότητας: επιλογή δυσκολίας
         difficulty = self.difficulty_var.get()
-        if difficulty not in ["Easy", "Medium", "Hard"]:
+        if difficulty not in ["Ευκολη", "Μέτρια", "Δύσκολη"]:
             messagebox.showerror("Σφάλμα", "Παρακαλώ επιλέξτε έγκυρο βαθμό δυσκολίας.")
             return
 
