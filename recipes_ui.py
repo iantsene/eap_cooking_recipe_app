@@ -2,42 +2,58 @@ import tkinter as tk
 import db
 
 # Συνάρτηση που καλείται όταν πατηθεί το κουμπί
-def on_save():
-    name       = entry_name.get().strip()      # διαβάζουμε τι έγραψε ο χρήστης
-    category   = entry_category.get().strip()
-    difficulty = int(entry_difficulty.get())
-    time_mins  = int(entry_time.get())
-    db.add_recipe(name, category, difficulty, time_mins)  # αποθηκεύουμε στη βάση
-    print(f"Αποθηκεύτηκε: {name}")
+def open_add_recipe(parent_window, on_close_callback):
+    """
+    Ανοίγει τη φόρμα προσθήκης ως popup πάνω στο κεντρικό παράθυρο.
+    - parent_window: το κεντρικό παράθυρο (main_window)
+    - on_close_callback: συνάρτηση που καλείται μετά το κλείσιμο
+      ώστε να ανανεωθεί ο πίνακας αυτόματα
+    """
 
-# Δημιουργία παραθύρου
-window = tk.Tk()
-window.title("Συνταγές")
+    # Toplevel = νέο παράθυρο που "ανήκει" στο κεντρικό
+    # (αντί για tk.Tk() που θα έφτιαχνε εντελώς ανεξάρτητο παράθυρο)
+    popup = tk.Toplevel(parent_window)
+    popup.title("Προσθήκη Συνταγής")
+    popup.resizable(False, False)
 
-# Τίτλος
-tk.Label(window, text="Διαχείριση Συνταγών",
-         font=("Arial", 16, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
+    def on_save():
+        name       = entry_name.get().strip()
+        category   = entry_category.get().strip()
 
-# Πεδία φόρμας — κάθε γραμμή: Label αριστερά, Entry δεξιά
-tk.Label(window, text="Όνομα:").grid(row=1, column=0, sticky="e", padx=8, pady=4)
-entry_name = tk.Entry(window, width=30)
-entry_name.grid(row=1, column=1, padx=8, pady=4)
+        try:
+            difficulty = int(entry_difficulty.get())
+            time_mins  = int(entry_time.get())
+        except ValueError:
+            tk.messagebox.showerror("Σφάλμα", "Η δυσκολία και ο χρόνος πρέπει να είναι αριθμοί!")
+            return
 
-tk.Label(window, text="Κατηγορία:").grid(row=2, column=0, sticky="e", padx=8, pady=4)
-entry_category = tk.Entry(window, width=30)
-entry_category.grid(row=2, column=1, padx=8, pady=4)
+        db.add_recipe(name, category, difficulty, time_mins)
+        print(f"Αποθηκεύτηκε: {name}")
 
-tk.Label(window, text="Δυσκολία (1-10):").grid(row=3, column=0, sticky="e", padx=8, pady=4)
-entry_difficulty = tk.Entry(window, width=30)
-entry_difficulty.grid(row=3, column=1, padx=8, pady=4)
+        popup.destroy()        # κλείνει το popup
+        on_close_callback()    # ανανεώνει τον πίνακα στο κεντρικό παράθυρο
 
-tk.Label(window, text="Χρόνος (λεπτά):").grid(row=4, column=0, sticky="e", padx=8, pady=4)
-entry_time = tk.Entry(window, width=30)
-entry_time.grid(row=4, column=1, padx=8, pady=4)
+    # Τίτλος
+    tk.Label(popup, text="Προσθήκη Συνταγής",
+             font=("Arial", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
 
-# Κουμπί — το command= συνδέει το κλικ με τη συνάρτηση on_save
-tk.Button(window, text="Αποθήκευση", command=on_save,
-          bg="#4CAF50", fg="white").grid(row=5, column=0, columnspan=2, pady=10)
+    # Πεδία φόρμας — κάθε γραμμή: Label αριστερά, Entry δεξιά
+    tk.Label(popup, text="Όνομα:").grid(row=1, column=0, sticky="e", padx=8, pady=4)
+    entry_name = tk.Entry(popup, width=30)
+    entry_name.grid(row=1, column=1, padx=8, pady=4)
 
-# Εκκίνηση — κρατάει το παράθυρο ανοιχτό
-window.mainloop()
+    tk.Label(popup, text="Κατηγορία:").grid(row=2, column=0, sticky="e", padx=8, pady=4)
+    entry_category = tk.Entry(popup, width=30)
+    entry_category.grid(row=2, column=1, padx=8, pady=4)
+
+    tk.Label(popup, text="Δυσκολία (1-10):").grid(row=3, column=0, sticky="e", padx=8, pady=4)
+    entry_difficulty = tk.Entry(popup, width=30)
+    entry_difficulty.grid(row=3, column=1, padx=8, pady=4)
+
+    tk.Label(popup, text="Χρόνος (λεπτά):").grid(row=4, column=0, sticky="e", padx=8, pady=4)
+    entry_time = tk.Entry(popup, width=30)
+    entry_time.grid(row=4, column=1, padx=8, pady=4)
+
+    # Κουμπί — το command= συνδέει το κλικ με τη συνάρτηση on_save
+    tk.Button(popup, text="Αποθήκευση", command=on_save,
+              bg="#4CAF50", fg="white").grid(row=5, column=0, columnspan=2, pady=10)
