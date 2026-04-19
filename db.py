@@ -9,6 +9,7 @@ class DatabaseConn:
     def __enter__(self):
         self.connection = sqlite3.connect(self.db_str)
         self.cursor = self.connection.cursor()
+        self.cursor.execute("PRAGMA foreign_keys = ON;")
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
