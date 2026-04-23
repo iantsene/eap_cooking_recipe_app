@@ -34,7 +34,3 @@ class DatabaseConn:
         if params:
             return self.cursor.execute(sql, params)
         return self.cursor.execute(sql)
-    
-    def commit(self):
-        if self.connection:
-            self.connection.commit()

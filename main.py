@@ -1046,6 +1046,197 @@ class RecipeFormPage:
             self.steps_hint_label.grid()
 
 
+class RecipeExecutePage:
+    def __init__(self, recipe_id):
+        # Φόρτωση συνταγής από τη βάση
+        self.recipe = Recipe.get_recipe_by_id(recipe_id)
+        if not self.recipe or not self.recipe.steps:
+            messagebox.showerror("Σφάλμα", "Δεν βρέθηκαν βήματα για αυτή τη συνταγή.")
+            return
+
+        self.steps = self.recipe.steps      # Λίστα βημάτων
+        self.current_index = 0              # Τρέχον βήμα — ξεκινά από 0
+        self.timer_seconds = 0              # Δευτερόλεπτα αντίστροφης μέτρησης
+        self.timer_running = False          # True=τρέχει, False=σταμάτησε
+        self.timer_job = None               # Αναφορά στο after() για ακύρωση αν χρειαστεί
+
+        # Συνολικός χρόνος για υπολογισμό ποσοστού
+        self.total_time = sum((s.duration_in_minutes or 0) for s in self.steps)
+        if self.total_time == 0:
+            self.total_time = 1             # Αποφυγή διαίρεσης με μηδέν
+
+        # Δημιουργία παραθύρου
+        self.window = tk.Toplevel()
+        self.window.title(f"Εκτέλεση: {self.recipe.name}")
+        self.window.geometry("520x560")
+        self.window.resizable(False, False)
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)  # X → on_close() αντί για άμεσο κλείσιμο
+
+        # Όνομα συνταγής
+        ttk.Label(self.window, text=self.recipe.name, font=("", 14, "bold")).pack(pady=(15, 5))
+
+        # Progress bar ολοκλήρωσης
+        pct_frame = ttk.Frame(self.window)
+        pct_frame.pack(fill=tk.X, padx=20, pady=5)
+        ttk.Label(pct_frame, text="Ολοκλήρωση:").pack(side=tk.LEFT)
+        self.progress_var = tk.DoubleVar(value=0)   # Μεταβλητή που ελέγχει το progress bar
+        ttk.Progressbar(pct_frame, variable=self.progress_var, maximum=100, length=280).pack(side=tk.LEFT, padx=8)
+        self.pct_label = ttk.Label(pct_frame, text="0%")
+        self.pct_label.pack(side=tk.LEFT)
+
+        ttk.Separator(self.window, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
+
+        # Λίστα υλικών συνταγής
+        ttk.Label(self.window, text="Υλικά Συνταγής:", font=("", 10, "bold")).pack(anchor=tk.W, padx=20)
+        ing_frame = ttk.Frame(self.window)
+        ing_frame.pack(fill=tk.X, padx=20, pady=5)
+        ing_list = tk.Listbox(ing_frame, height=4, width=60)
+        ing_list.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ing_scroll = ttk.Scrollbar(ing_frame, orient=tk.VERTICAL, command=ing_list.yview)
+        ing_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        ing_list.configure(yscrollcommand=ing_scroll.set)
+        for ing in self.recipe.ingredients:
+            ing_list.insert(tk.END, f"  {ing.quantity or ''} {ing.unit or ''} {ing.name or ''}")
+
+        ttk.Separator(self.window, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
+
+        # Κουμπί Εκκίνησης — κρύβεται μόλις πατηθεί
+        self.start_button = ttk.Button(self.window, text="Εκκίνηση", command=self.start_recipe)
+        self.start_button.pack(pady=5)
+
+        # Περιοχή βήματος — κρυμμένη αρχικά, εμφανίζεται μετά την Εκκίνηση
+        self.step_frame = ttk.LabelFrame(self.window, text="Τρέχον Βήμα", padding=10)
+
+        self.step_num_label = ttk.Label(self.step_frame, text="", font=("", 10, "bold"))
+        self.step_num_label.grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=(0, 5))
+
+        ttk.Label(self.step_frame, text="Τίτλος:").grid(row=1, column=0, sticky=tk.W)
+        self.step_title_label = ttk.Label(self.step_frame, text="", width=40)
+        self.step_title_label.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=5)
+
+        ttk.Label(self.step_frame, text="Περιγραφή:").grid(row=2, column=0, sticky=tk.NW, pady=5)
+        self.step_text_label = ttk.Label(self.step_frame, text="", wraplength=340, justify=tk.LEFT)
+        self.step_text_label.grid(row=2, column=1, columnspan=2, sticky=tk.W, padx=5)
+
+        ttk.Label(self.step_frame, text="Χρόνος:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.step_time_label = ttk.Label(self.step_frame, text="", foreground="gray")
+        self.step_time_label.grid(row=3, column=1, sticky=tk.W, padx=5)
+        self.countdown_label = ttk.Label(self.step_frame, text="", foreground="red", font=("", 11, "bold"))
+        self.countdown_label.grid(row=3, column=2, sticky=tk.W, padx=10)
+
+        # Κουμπιά βήματος
+        btn_frame = ttk.Frame(self.step_frame)
+        btn_frame.grid(row=4, column=0, columnspan=3, pady=(10, 0))
+        self.step_start_btn = ttk.Button(btn_frame, text="Εκκίνηση Βήματος", command=self.start_timer)
+        self.step_start_btn.pack(side=tk.LEFT, padx=5)
+        self.pause_btn = ttk.Button(btn_frame, text="Pause", command=self.toggle_pause, state=tk.DISABLED)
+        self.pause_btn.pack(side=tk.LEFT, padx=5)
+        self.previous_btn = ttk.Button(btn_frame, text="Προηγούμενο Βήμα", command=self.previous_step, state=tk.DISABLED)
+        self.previous_btn.pack(side=tk.LEFT, padx=5)
+        self.next_btn = ttk.Button(btn_frame, text="Επόμενο Βήμα", command=self.next_step)
+        self.next_btn.pack(side=tk.LEFT, padx=5)
+
+    def start_recipe(self):
+        # Κρύβει το κουμπί Εκκίνηση και εμφανίζει την περιοχή βήματος
+        self.start_button.pack_forget()
+        self.step_frame.pack(fill=tk.X, padx=20, pady=5)
+        self.show_step()
+
+    def show_step(self):
+        # Εμφανίζει το τρέχον βήμα — καλείται κάθε φορά που αλλάζει βήμα
+        self.stop_timer()
+        step = self.steps[self.current_index]
+
+        self.step_num_label.config(text=f"Βήμα {self.current_index + 1} από {len(self.steps)}")
+        self.step_title_label.config(text=step.step_name or "")
+        self.step_text_label.config(text=step.step_text or "")
+        self.step_time_label.config(text=f"{step.duration_in_minutes or 0} λεπτά")
+        self.countdown_label.config(text="")
+
+        # Ποσοστό = χρόνος βημάτων που ΤΕΛΕΙΩΣΑΝ / συνολικός χρόνος
+        completed_time = sum((self.steps[i].duration_in_minutes or 0) for i in range(self.current_index))
+        pct = (completed_time / self.total_time) * 100
+        self.progress_var.set(pct)
+        self.pct_label.config(text=f"{int(pct)}%")
+
+        self.step_start_btn.config(state=tk.NORMAL)
+        self.pause_btn.config(text="Pause", state=tk.DISABLED)
+
+        if self.current_index == 0:
+            self.previous_btn.config(state=tk.DISABLED)
+        else:
+            self.previous_btn.config(state=tk.NORMAL)
+
+        # Αν είναι το τελευταίο βήμα, αλλάζει σε "Ολοκλήρωση"
+        if self.current_index == len(self.steps) - 1:
+            self.next_btn.config(text="Ολοκλήρωση", command=self.finish)
+        else:
+            self.next_btn.config(text="Επόμενο Βήμα", command=self.next_step)
+
+    def start_timer(self):
+        # Μετατρέπει λεπτά σε δευτερόλεπτα και ξεκινάει την αντίστροφη μέτρηση
+        step = self.steps[self.current_index]
+        self.timer_seconds = (step.duration_in_minutes or 0) * 60
+        self.timer_running = True
+        self.step_start_btn.config(state=tk.DISABLED)
+        self.pause_btn.config(state=tk.NORMAL)
+        self._tick()
+
+    def _tick(self):
+        # Εκτελείται κάθε 1 δευτερόλεπτο — η καρδιά της αντίστροφης μέτρησης
+        if not self.timer_running:
+            return
+        if self.timer_seconds > 0:
+            mins, secs = divmod(self.timer_seconds, 60)     # Μετατροπή σε MM:SS
+            self.countdown_label.config(text=f"{mins:02d}:{secs:02d}")
+            self.timer_seconds -= 1
+            self.timer_job = self.window.after(1000, self._tick)  # Επόμενο tick σε 1 δευτερόλεπτο
+        else:
+            self.countdown_label.config(text="Τελος!")
+            self.timer_running = False
+            messagebox.showinfo("Χρόνος!", "Ο χρόνος του βήματος ολοκληρώθηκε!")
+
+    def toggle_pause(self):
+        # Εναλλάσσει Pause/Resume
+        if self.timer_running:
+            self.timer_running = False
+            if self.timer_job:
+                self.window.after_cancel(self.timer_job)
+            self.pause_btn.config(text="Resume")
+        else:
+            self.timer_running = True
+            self.pause_btn.config(text="Pause")
+            self._tick()
+
+    def stop_timer(self):
+        # Σταματάει πλήρως τον χρονομετρητή — σημαντικό για αποφυγή crash
+        self.timer_running = False
+        if self.timer_job:
+            self.window.after_cancel(self.timer_job)
+            self.timer_job = None
+
+    def previous_step(self):
+        if self.current_index > 0:
+            self.stop_timer()
+            self.current_index -= 1
+            self.show_step()
+
+    def next_step(self):
+        self.current_index += 1
+        self.show_step()
+
+    def finish(self):
+        self.stop_timer()
+        self.progress_var.set(100)
+        self.pct_label.config(text="100%")
+        messagebox.showinfo("Ολοκλήρωση!", f"Η συνταγή '{self.recipe.name}' ολοκληρώθηκε!")
+        self.window.destroy()
+
+    def on_close(self):
+        # ΠΡΩΤΑ σταμάτα τον χρονομετρητή — αλλιώς crash από pending after()
+        self.stop_timer()
+        self.window.destroy()
+
 # Κύρια κλάση της εφαρμογής διαχείρισης συνταγών
 class RecipeApp:
     def __init__(self, root):
@@ -1076,7 +1267,7 @@ class RecipeApp:
         ttk.Button(root, text="Εμφάνιση Συνταγών", command=self.view_recipes).grid(row=0, column=3, pady=10, padx=10)
         ttk.Button(root, text="Εμφάνιση Συνταγης", command=self.view_recipe).grid(row=1, column=1, pady=10, padx=10)
         ttk.Button(root, text="Αναζήτηση Συνταγής", command=self.recipe_lookup).grid(row=1, column=2, pady=10, padx=10)
-        ttk.Button(root, text="Εκτέλεση Συνταγής", command=self.recipe_lookup).grid(row=1, column=3, pady=10, padx=10)
+        ttk.Button(root, text="Εκτέλεση Συνταγής", command=self.recipe_launch).grid(row=1, column=3, pady=10, padx=10)
 
         # Listbox για εμφάνιση όλων των συνταγών
         self.recipes_table = ttk.Treeview(root, columns=('Αριθμός', 'Όνομα', 'Κατηγορία', 'Δυσκολία', 'Χρόνος Εκτέλεσης'), show='headings')
@@ -1271,8 +1462,17 @@ class RecipeApp:
                 ), tags=(str(row[0]),))  # Store real ID in tags
 
     def recipe_launch(self):
+        """Launch the recipe execution mode"""
         selected = self.recipes_table.selection()
-        pass
+        if not selected:
+            messagebox.showerror("Σφάλμα", "Επιλέξτε μια συνταγή για εκτέλεση.")
+            return
+        
+        # Get the real recipe ID from tags (stored during view_recipes)
+        real_id = int(self.recipes_table.item(selected[0], 'tags')[0])
+        
+        # Pass the recipe_id to RecipeExecutePage
+        RecipeExecutePage(recipe_id=real_id)
     
 
 # Σημείο εισόδου της εφαρμογής
