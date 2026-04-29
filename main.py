@@ -1153,8 +1153,8 @@ class RecipeExecutePage:
         self.step_time_label.config(text=f"{step.duration_in_minutes or 0} λεπτά")
         self.countdown_label.config(text="")
 
-        # Ποσοστό = χρόνος βημάτων που ΤΕΛΕΙΩΣΑΝ / συνολικός χρόνος
-        completed_time = sum((self.steps[i].duration_in_minutes or 0) for i in range(self.current_index))
+        # Ποσοστό = χρόνος βημάτων που ΕΧΟΥΝ ΞΕΚΙΝΗΣΕΙ (συμπεριλαμβανομένου του τρέχοντος) / συνολικός χρόνος
+        completed_time = sum((self.steps[i].duration_in_minutes or 0) for i in range(self.current_index + 1))
         pct = (completed_time / self.total_time) * 100
         self.progress_var.set(pct)
         self.pct_label.config(text=f"{int(pct)}%")
