@@ -1,0 +1,16 @@
+# Database files
+recipe_database.db
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# User uploaded images
+recipe_images/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
