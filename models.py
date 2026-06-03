@@ -228,6 +228,54 @@ class Step:
         self.duration_in_minutes = duration_in_minutes
         self.allocations = []
 
+class ImageModel:
+    def __init__(self, id=None, path=None):
+        self.id = id
+        self.path = path
+
+    @staticmethod
+    def save_image(path):
+        if not path:
+            return None
+        with DatabaseConn("recipe_database.db") as db:
+            db.execute("SELECT id FROM images WHERE path = ?", (path,))
+            existing = db.fetchone()
+            if existing:
+                return existing[0]
+            
+            db.execute("INSERT INTO images (path) VALUES (?)", (path,))
+            return db.cursor.lastrowid
+    
+    @staticmethod
+    def get_path_by_id(image_id):
+        if not image_id:
+            return None
+        with DatabaseConn("recipe_database.db") as db:
+            db.execute("SELECT path FROM images WHERE id = ?", (image_id,))
+            result = db.fetchone()
+            return result[0] if result else None
+    
+    @staticmethod
+    def delete_image(image_id):
+        if not image_id:
+            return False
+        
+        with DatabaseConn("recipe_database.db") as db:
+            db.execute("SELECT path FROM images WHERE id = ?", (image_id,))
+            result = db.fetchone()
+            path = result[0] if result else None
+            
+            db.execute("DELETE FROM images WHERE id = ?", (image_id,))
+            
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                    return True
+                except Exception as e:
+                    print(f"Could not delete image file: {e}")
+            return True
+
+
 class Recipe:
     def __init__(self, id=None, name="", category="", difficulty="", total_time_minutes=0):
         self.id = id
@@ -444,50 +492,3 @@ class Recipe:
                     ORDER BY r.name COLLATE NOCASE
                 """)
             return db.fetchall()
-
-class ImageModel:
-    def __init__(self, id=None, path=None):
-        self.id = id
-        self.path = path
-
-    @staticmethod
-    def save_image(path):
-        if not path:
-            return None
-        with DatabaseConn("recipe_database.db") as db:
-            db.execute("SELECT id FROM images WHERE path = ?", (path,))
-            existing = db.fetchone()
-            if existing:
-                return existing[0]
-            
-            db.execute("INSERT INTO images (path) VALUES (?)", (path,))
-            return db.cursor.lastrowid
-    
-    @staticmethod
-    def get_path_by_id(image_id):
-        if not image_id:
-            return None
-        with DatabaseConn("recipe_database.db") as db:
-            db.execute("SELECT path FROM images WHERE id = ?", (image_id,))
-            result = db.fetchone()
-            return result[0] if result else None
-    
-    @staticmethod
-    def delete_image(image_id):
-        if not image_id:
-            return False
-        
-        with DatabaseConn("recipe_database.db") as db:
-            db.execute("SELECT path FROM images WHERE id = ?", (image_id,))
-            result = db.fetchone()
-            path = result[0] if result else None
-            
-            db.execute("DELETE FROM images WHERE id = ?", (image_id,))
-            
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                    return True
-                except Exception as e:
-                    print(f"Could not delete image file: {e}")
-            return True
