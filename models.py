@@ -42,7 +42,7 @@ class ListManager:
         main_frame = ctk.CTkFrame(d)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        ctk.CTkLabel(main_frame, text=f"Λίστα {cls.ITEM_NAME}ών", font=("Segoe UI", 16, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(main_frame, text=f"Λίστα {cls.ITEM_NAME}", font=("Segoe UI", 16, "bold")).pack(pady=(0, 10))
         
         list_frame = ctk.CTkFrame(main_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
@@ -142,7 +142,7 @@ class ListManager:
 
 class Category(ListManager):
     TABLE_NAME = "categories_list"
-    ITEM_NAME = "Κατηγορία"
+    ITEM_NAME = "Κατηγοριών"
     WINDOW_TITLE = "Διαχείριση Κατηγοριών"
     
     @staticmethod
@@ -177,7 +177,7 @@ class Category(ListManager):
 
 class Unit(ListManager):
     TABLE_NAME = "unit_list"
-    ITEM_NAME = "Μονάδα"
+    ITEM_NAME = "Μονάδων"
     WINDOW_TITLE = "Διαχείριση Μονάδων"
     
     @classmethod
@@ -194,7 +194,7 @@ class Unit(ListManager):
 
 class Ingredient(ListManager):
     TABLE_NAME = "ingredient_list"
-    ITEM_NAME = "Υλικό"
+    ITEM_NAME = "Υλικών"
     WINDOW_TITLE = "Διαχείριση Υλικών"
     
     def __init__(self, id=None, recipe_id=None, name="", quantity=0, unit="", notes=""):
